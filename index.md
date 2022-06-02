@@ -198,8 +198,8 @@ Further dissect E, S, and G.
 
 
 
-
-### R Code:
+##
+## R Code:
 
 Load libraries and functions
 ```
