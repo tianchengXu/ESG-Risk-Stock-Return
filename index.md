@@ -108,6 +108,9 @@ Both have relatively high t-values, which suggest that there's significant evide
 it supports our findings from the previous analysis.
 
 
+### R Code:
+
+Load libraries and functions
 ```
 library(data.table)
 library(dplyr)
@@ -124,9 +127,10 @@ DATE2 <- function(x) {
   dte <- as.Date(sprintf("20%s-%s-%s",substr(s,7,8),substr(s,4,5),substr(s,1,2)))
   return(dte)
 }
+```
 
-################################################################################
-
+Data ETL
+```
 # The master table consists of 4 separate datasets that we managed to pull from 
 # WRDS-RepRisk, WRDS-CRSP and other online sources. Each of these 4 datasets were
 # were collected and compiled before loading into this R file.
@@ -138,7 +142,6 @@ DATE2 <- function(x) {
 # SPY_Daily_Returns
 
 
-################################################################################
 # Load RRI data collected from WRDS-RepRisk
 
 data <- fread('S&P500_RRI.csv')
@@ -203,9 +206,6 @@ master[, ratings := case_when(substr(date,1,4) == '2016' ~ m2016,
 write.csv(master, 'master.csv')
 
 
-
-################################################################################
-################################################################################
 ################################################################################
 # Create dataset where RRI jump >10, >5 and >20
 data_10 <- master[`RRI_trend`>10,]
@@ -219,8 +219,10 @@ write.csv(data_5, 'data_5.csv')
 data_20 <- master[`RRI_trend`>20,]
 data_20
 write.csv(data_20, 'data_20.csv')
+```
 
-################################################################################
+Correlation
+```
 # Correlation between stock returns and RRI_trend
 
 ret_5 <- c(cor(master[ratings == 'AAA', ret_5], master[ratings == 'AAA', RRI_trend]), 
@@ -544,8 +546,6 @@ write.csv(rating_ret_cor_c_med, 'rating_ret_cor_c_med.csv')
 
 
 
-
-
 ret_5_c_low <- c(cor(low[ratings == 'AAA', ret_5], low[ratings == 'AAA', current_RRI]), 
                  cor(low[ratings == 'AA', ret_5], low[ratings == 'AA', current_RRI]), 
                  cor(low[ratings == 'A', ret_5], low[ratings == 'A', current_RRI]), 
@@ -587,14 +587,10 @@ rownames(rating_ret_cor_c_low) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X
 rating_ret_cor_c_low
 
 write.csv(rating_ret_cor_c_low, 'rating_ret_cor_c_low.csv')
+```
 
-
-
-
-
-
-
-################################################################################
+Average Excess Returns Table & T Statistics
+```
 # Create the excess return table for >10
 ex_ret_5 <- c(mean(data_10[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
               mean(data_10[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
@@ -880,13 +876,10 @@ ratings_exret[, ex_ret_5 := (1+ex_ret_5)^(252/5)-1]
 ratings_exret[, ex_ret_10 := (1+ex_ret_10)^(252/10)-1]
 ratings_exret[, ex_ret_30 := (1+ex_ret_30)^(252/30)-1]
 write.csv(ratings_exret, 'ratings_exret_20.csv')
+```
 
-
-
-
-
-
-################################################################################
+Alphas & Betas
+```
 # Alphas and Betas
 df <- fread("data_10 (2).csv")
 head(df)
@@ -981,8 +974,6 @@ model_A_5 <- lm(ratings_A$ret_5 ~ ratings_A$`5_day_spy_ret`)
 summary(model_A_5)
 #0.0009832
 #0.7899841
-
-
 
 
 #Ratings BBB
