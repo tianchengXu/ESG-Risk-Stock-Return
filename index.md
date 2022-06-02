@@ -22,7 +22,7 @@ ESG stands for Environmental, Social, and Governance. It is an approach to evalu
 <img width="797" alt="image" src="https://user-images.githubusercontent.com/63265930/171542076-c14e596a-e3ed-42f5-94c1-1f0b1a47fd18.png">
 
 ### What is a healthy company?
-We define companies with high credit ratings as "healthy companies", and companies with low credit ratings as "low companies".
+We define companies with high credit ratings as "healthy companies", and companies with low credit ratings as "unhealthy companies".
 
 ### Database Overview
 <img width="480" alt="image" src="https://user-images.githubusercontent.com/63265930/171542244-f2aef291-ef6c-4939-abdb-3ef756e05005.png">
@@ -36,21 +36,3 @@ The RRI of company A depends only on A’s risk incidents. The RRI reflects a co
 
 A company's RRI gets updated by the end of each month. It represents the combined effect of risk incidents throughout the month (or decaying effect if no significant risk incidents).
 
-
-```
-library(data.table)
-library(dplyr)
-library(readxl)
-
-DATE <- function(yyyymmdd) {
-  s <- as.character(yyyymmdd)
-  dte <- as.Date(sprintf("%s-%s-%s",substr(s,1,4),substr(s,5,6),substr(s,7,8)))
-  return(dte)
-}
-
-DATE2 <- function(x) {
-  s <- as.character(x)
-  dte <- as.Date(sprintf("20%s-%s-%s",substr(s,7,8),substr(s,4,5),substr(s,1,2)))
-  return(dte)
-}
-```
