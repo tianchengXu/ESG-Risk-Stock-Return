@@ -108,3 +108,940 @@ Both have relatively high t-values, which suggest that there's significant evide
 it supports our findings from the previous analysis.
 
 
+```
+library(data.table)
+library(dplyr)
+library(readxl)
+
+DATE <- function(yyyymmdd) {
+  s <- as.character(yyyymmdd)
+  dte <- as.Date(sprintf("%s-%s-%s",substr(s,1,4),substr(s,5,6),substr(s,7,8)))
+  return(dte)
+}
+
+DATE2 <- function(x) {
+  s <- as.character(x)
+  dte <- as.Date(sprintf("20%s-%s-%s",substr(s,7,8),substr(s,4,5),substr(s,1,2)))
+  return(dte)
+}
+
+################################################################################
+
+# The master table consists of 4 separate datasets that we managed to pull from 
+# WRDS-RepRisk, WRDS-CRSP and other online sources. Each of these 4 datasets were
+# were collected and compiled before loading into this R file.
+# These individual tables are:
+
+# RRI (WRDS-RepRisk)
+# Stock_Returns (WRDS-CRSP)
+# Credit_Ratings
+# SPY_Daily_Returns
+
+
+################################################################################
+# Load RRI data collected from WRDS-RepRisk
+
+data <- fread('S&P500_RRI.csv')
+data[, date := DATE(date)]
+
+# Data cleaning
+data[data$ticker == 'BRK.', ticker := 'BRK.B']
+data[data$ticker == 'CMCS', ticker := 'CMCSA']
+data[data$ticker == 'UAA', ticker := 'UA']
+data[data$ticker == 'NWSA', ticker := 'NWS']
+data[data$ticker == 'FOXA', ticker := 'FOX']
+
+# Create a mutated date for score_dates that fall onto a Sat. or Sun
+# The mutated date is the last Friday before the weekend
+data[, date_mut := case_when(weekdays(date) == "Saturday" ~ date -1, 
+                             weekdays(date) == "Sunday" ~ date - 2, 
+                             TRUE ~ date)]
+
+################################################################################
+# Load Stock_Returns data collected from WRDS-CRSP
+
+stocks <- fread('stocks.csv')
+stocks[, date := as.Date(date, format = "%m/%d/%y")]
+
+# Create the master table by merging the existing 2 tables
+master <- merge(data, stocks, by.x=c('permno','date_mut'), by.y=c('PERMNO','date'))
+
+################################################################################
+# Load SPY_Returns data
+bench <- fread('bench_price_new.csv')
+bench[,date := as.Date(date)]
+
+# Merge the data into the master table by date
+master <- merge(master, bench, by.x='date_mut', by.y='date', all.x=TRUE)
+
+################################################################################
+# Load Credit_ratings data
+ratings <- fread('credit_ratings.csv', header=TRUE)
+
+# Data cleaning. Simplify the categories
+colnames(ratings) <- c('ticker', 'orig_2016', 'orig_2017', 'orig_2018', 'orig_2019', 'orig_2020')
+ratings[, m2016 := str_replace_all(orig_2016, "[^[:alnum:]]", "")]
+ratings[, m2017 := str_replace_all(orig_2017, "[^[:alnum:]]", "")]
+ratings[, m2018 := str_replace_all(orig_2018, "[^[:alnum:]]", "")]
+ratings[, m2019 := str_replace_all(orig_2019, "[^[:alnum:]]", "")]
+ratings[, m2020 := str_replace_all(orig_2020, "[^[:alnum:]]", "")]
+ratings <- ratings[,c('ticker', 'm2016', 'm2017', 'm2018', 'm2019', 'm2020')]
+
+# Merge the data into the master table by ticker
+master <- merge(master, ratings, by.x='ticker', by.y='ticker')
+
+# Create the current-year rating for each update in score
+master[, ratings := case_when(substr(date,1,4) == '2016' ~ m2016,
+                              substr(date,1,4) == '2017' ~ m2017,
+                              substr(date,1,4) == '2018' ~ m2018,
+                              substr(date,1,4) == '2019' ~ m2019,
+                              substr(date,1,4) == '2020' ~ m2020)]
+
+################################################################################
+# Output the master table as a csv file
+
+write.csv(master, 'master.csv')
+
+
+
+################################################################################
+################################################################################
+################################################################################
+# Create dataset where RRI jump >10, >5 and >20
+data_10 <- master[`RRI_trend`>10,]
+data_10
+write.csv(data_10, 'data_10.csv')
+
+data_5 <- master[`RRI_trend`>5,]
+data_5
+write.csv(data_5, 'data_5.csv')
+
+data_20 <- master[`RRI_trend`>20,]
+data_20
+write.csv(data_20, 'data_20.csv')
+
+################################################################################
+# Correlation between stock returns and RRI_trend
+
+ret_5 <- c(cor(master[ratings == 'AAA', ret_5], master[ratings == 'AAA', RRI_trend]), 
+           cor(master[ratings == 'AA', ret_5], master[ratings == 'AA', RRI_trend]), 
+           cor(master[ratings == 'A', ret_5], master[ratings == 'A', RRI_trend]), 
+           cor(master[ratings == 'BBB', ret_5], master[ratings == 'BBB', RRI_trend]), 
+           cor(master[ratings == 'BB', ret_5], master[ratings == 'BB', RRI_trend]), 
+           cor(master[ratings == 'B', ret_5], master[ratings == 'B', RRI_trend]), 
+           cor(master[ratings == 'NR', ret_5], master[ratings == 'NR', RRI_trend]), 
+           cor(master[ratings == 'X', ret_5], master[ratings == 'X', RRI_trend]))
+
+ret_10 <- c(cor(master[ratings == 'AAA', ret_10], master[ratings == 'AAA', RRI_trend]), 
+           cor(master[ratings == 'AA', ret_10], master[ratings == 'AA', RRI_trend]), 
+           cor(master[ratings == 'A', ret_10], master[ratings == 'A', RRI_trend]), 
+           cor(master[ratings == 'BBB', ret_10], master[ratings == 'BBB', RRI_trend]), 
+           cor(master[ratings == 'BB', ret_10], master[ratings == 'BB', RRI_trend]), 
+           cor(master[ratings == 'B', ret_10], master[ratings == 'B', RRI_trend]), 
+           cor(master[ratings == 'NR', ret_10], master[ratings == 'NR', RRI_trend]), 
+           cor(master[ratings == 'X', ret_10], master[ratings == 'X', RRI_trend]))
+
+ret_30 <- c(cor(master[ratings == 'AAA', ret_30], master[ratings == 'AAA', RRI_trend]), 
+           cor(master[ratings == 'AA', ret_30], master[ratings == 'AA', RRI_trend]), 
+           cor(master[ratings == 'A', ret_30], master[ratings == 'A', RRI_trend]), 
+           cor(master[ratings == 'BBB', ret_30], master[ratings == 'BBB', RRI_trend]), 
+           cor(master[ratings == 'BB', ret_30], master[ratings == 'BB', RRI_trend]), 
+           cor(master[ratings == 'B', ret_30], master[ratings == 'B', RRI_trend]), 
+           cor(master[ratings == 'NR', ret_30], master[ratings == 'NR', RRI_trend]), 
+           cor(master[ratings == 'X', ret_30], master[ratings == 'X', RRI_trend]))
+
+ret_180 <- c(cor(master[ratings == 'AAA', ret_180], master[ratings == 'AAA', RRI_trend]), 
+             cor(master[ratings == 'AA', ret_180], master[ratings == 'AA', RRI_trend]), 
+             cor(master[ratings == 'A', ret_180], master[ratings == 'A', RRI_trend]), 
+             cor(master[ratings == 'BBB', ret_180], master[ratings == 'BBB', RRI_trend]), 
+             cor(master[ratings == 'BB', ret_180], master[ratings == 'BB', RRI_trend]), 
+             cor(master[ratings == 'B', ret_180], master[ratings == 'B', RRI_trend]), 
+             cor(master[ratings == 'NR', ret_180], master[ratings == 'NR', RRI_trend]),
+             cor(master[ratings == 'X', ret_180], master[ratings == 'X', RRI_trend]))
+
+rating_ret_cor <- data.frame(ret_5, ret_10, ret_30, ret_180)
+rownames(rating_ret_cor) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+rating_ret_cor
+
+write.csv(rating_ret_cor, 'rating_ret_cor.csv')
+
+################################################################################
+# Correlation between stock returns and current_RRI
+
+ret_5_c <- c(cor(master[ratings == 'AAA', ret_5], master[ratings == 'AAA', current_RRI]), 
+           cor(master[ratings == 'AA', ret_5], master[ratings == 'AA', current_RRI]), 
+           cor(master[ratings == 'A', ret_5], master[ratings == 'A', current_RRI]), 
+           cor(master[ratings == 'BBB', ret_5], master[ratings == 'BBB', current_RRI]), 
+           cor(master[ratings == 'BB', ret_5], master[ratings == 'BB', current_RRI]), 
+           cor(master[ratings == 'B', ret_5], master[ratings == 'B', current_RRI]), 
+           cor(master[ratings == 'NR', ret_5], master[ratings == 'NR', current_RRI]), 
+           cor(master[ratings == 'X', ret_5], master[ratings == 'X', current_RRI]))
+
+ret_10_c <- c(cor(master[ratings == 'AAA', ret_10], master[ratings == 'AAA', current_RRI]), 
+            cor(master[ratings == 'AA', ret_10], master[ratings == 'AA', current_RRI]), 
+            cor(master[ratings == 'A', ret_10], master[ratings == 'A', current_RRI]), 
+            cor(master[ratings == 'BBB', ret_10], master[ratings == 'BBB', current_RRI]), 
+            cor(master[ratings == 'BB', ret_10], master[ratings == 'BB', current_RRI]), 
+            cor(master[ratings == 'B', ret_10], master[ratings == 'B', current_RRI]), 
+            cor(master[ratings == 'NR', ret_10], master[ratings == 'NR', current_RRI]), 
+            cor(master[ratings == 'X', ret_10], master[ratings == 'X', current_RRI]))
+
+ret_30_c <- c(cor(master[ratings == 'AAA', ret_30], master[ratings == 'AAA', current_RRI]), 
+            cor(master[ratings == 'AA', ret_30], master[ratings == 'AA', current_RRI]), 
+            cor(master[ratings == 'A', ret_30], master[ratings == 'A', current_RRI]), 
+            cor(master[ratings == 'BBB', ret_30], master[ratings == 'BBB', current_RRI]), 
+            cor(master[ratings == 'BB', ret_30], master[ratings == 'BB', current_RRI]), 
+            cor(master[ratings == 'B', ret_30], master[ratings == 'B', current_RRI]), 
+            cor(master[ratings == 'NR', ret_30], master[ratings == 'NR', current_RRI]), 
+            cor(master[ratings == 'X', ret_30], master[ratings == 'X', current_RRI]))
+
+ret_180_c <- c(cor(master[ratings == 'AAA', ret_180], master[ratings == 'AAA', current_RRI]), 
+             cor(master[ratings == 'AA', ret_180], master[ratings == 'AA', current_RRI]), 
+             cor(master[ratings == 'A', ret_180], master[ratings == 'A', current_RRI]), 
+             cor(master[ratings == 'BBB', ret_180], master[ratings == 'BBB', current_RRI]), 
+             cor(master[ratings == 'BB', ret_180], master[ratings == 'BB', current_RRI]), 
+             cor(master[ratings == 'B', ret_180], master[ratings == 'B', current_RRI]), 
+             cor(master[ratings == 'NR', ret_180], master[ratings == 'NR', current_RRI]),
+             cor(master[ratings == 'X', ret_180], master[ratings == 'X', current_RRI]))
+
+rating_ret_cor_c <- data.frame(ret_5_c, ret_10_c, ret_30_c, ret_180_c)
+rownames(rating_ret_cor_c) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+rating_ret_cor_c
+
+write.csv(rating_ret_cor_c, 'rating_ret_cor_c.csv')
+
+################################################################################
+# Correlation breakdown by RepRisk Riskness
+
+
+
+high <- master[peak_RRI >= 50,]
+low <- master[peak_RRI <= 25,]
+med <- master[peak_RRI > 25 & peak_RRI < 50,]
+
+# High
+ret_5_high <- c(cor(high[ratings == 'AAA', ret_5], high[ratings == 'AAA', RRI_trend]), 
+                cor(high[ratings == 'AA', ret_5], high[ratings == 'AA', RRI_trend]), 
+                cor(high[ratings == 'A', ret_5], high[ratings == 'A', RRI_trend]), 
+                cor(high[ratings == 'BBB', ret_5], high[ratings == 'BBB', RRI_trend]), 
+                cor(high[ratings == 'BB', ret_5], high[ratings == 'BB', RRI_trend]), 
+                cor(high[ratings == 'B', ret_5], high[ratings == 'B', RRI_trend]), 
+                cor(high[ratings == 'NR', ret_5], high[ratings == 'NR', RRI_trend]), 
+                cor(high[ratings == 'X', ret_5], high[ratings == 'X', RRI_trend]))
+
+ret_10_high <- c(cor(high[ratings == 'AAA', ret_10], high[`ratings` == 'AAA', RRI_trend]), 
+                 cor(high[ratings == 'AA', ret_10], high[`ratings` == 'AA', RRI_trend]), 
+                 cor(high[ratings == 'A', ret_10], high[`ratings` == 'A', RRI_trend]), 
+                 cor(high[ratings == 'BBB', ret_10], high[`ratings` == 'BBB', RRI_trend]), 
+                 cor(high[ratings == 'BB', ret_10], high[`ratings` == 'BB', RRI_trend]), 
+                 cor(high[ratings == 'B', ret_10], high[`ratings` == 'B', RRI_trend]), 
+                 cor(high[ratings == 'NR', ret_10], high[`ratings` == 'NR', RRI_trend]), 
+                 cor(high[ratings == 'X', ret_10], high[`ratings` == 'X', RRI_trend]))
+
+ret_30_high <- c(cor(high[`ratings` == 'AAA', ret_30], high[`ratings` == 'AAA', RRI_trend]), 
+                 cor(high[`ratings` == 'AA', ret_30], high[`ratings` == 'AA', RRI_trend]), 
+                 cor(high[`ratings` == 'A', ret_30], high[`ratings` == 'A', RRI_trend]), 
+                 cor(high[`ratings` == 'BBB', ret_30], high[`ratings` == 'BBB', RRI_trend]), 
+                 cor(high[`ratings` == 'BB', ret_30], high[`ratings` == 'BB', RRI_trend]), 
+                 cor(high[`ratings` == 'B', ret_30], high[`ratings` == 'B', RRI_trend]), 
+                 cor(high[`ratings` == 'NR', ret_30], high[`ratings` == 'NR', RRI_trend]), 
+                 cor(high[`ratings` == 'X', ret_30], high[`ratings` == 'X', RRI_trend]))
+
+ret_180_high <- c(cor(high[`ratings` == 'AAA', ret_180], high[`ratings` == 'AAA', RRI_trend]), 
+                  cor(high[`ratings` == 'AA', ret_180], high[`ratings` == 'AA', RRI_trend]), 
+                  cor(high[`ratings` == 'A', ret_180], high[`ratings` == 'A', RRI_trend]), 
+                  cor(high[`ratings` == 'BBB', ret_180], high[`ratings` == 'BBB', RRI_trend]), 
+                  cor(high[`ratings` == 'BB', ret_180], high[`ratings` == 'BB', RRI_trend]), 
+                  cor(high[`ratings` == 'B', ret_180], high[`ratings` == 'B', RRI_trend]), 
+                  cor(high[`ratings` == 'NR', ret_180], high[`ratings` == 'NR', RRI_trend]),
+                  cor(high[`ratings` == 'X', ret_180], high[`ratings` == 'X', RRI_trend]))
+
+rating_ret_cor_high <- data.frame(ret_5_high, ret_10_high, ret_30_high, ret_180_high)
+rownames(rating_ret_cor_high) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+rating_ret_cor_high
+
+write.csv(rating_ret_cor_high, 'rating_ret_cor_high.csv')
+
+
+# Low
+ret_5_low <- c(cor(low[ratings == 'AAA', ret_5], low[ratings == 'AAA', RRI_trend]), 
+               cor(low[ratings == 'AA', ret_5], low[ratings == 'AA', RRI_trend]), 
+               cor(low[ratings == 'A', ret_5], low[ratings == 'A', RRI_trend]), 
+               cor(low[ratings == 'BBB', ret_5], low[ratings == 'BBB', RRI_trend]), 
+               cor(low[ratings == 'BB', ret_5], low[ratings == 'BB', RRI_trend]), 
+               cor(low[ratings == 'B', ret_5], low[ratings == 'B', RRI_trend]), 
+               cor(low[ratings == 'NR', ret_5], low[ratings == 'NR', RRI_trend]), 
+               cor(low[ratings == 'X', ret_5], low[ratings == 'X', RRI_trend]))
+
+ret_10_low <- c(cor(low[ratings == 'AAA', ret_10], low[`ratings` == 'AAA', RRI_trend]), 
+                cor(low[ratings == 'AA', ret_10], low[`ratings` == 'AA', RRI_trend]), 
+                cor(low[ratings == 'A', ret_10], low[`ratings` == 'A', RRI_trend]), 
+                cor(low[ratings == 'BBB', ret_10], low[`ratings` == 'BBB', RRI_trend]), 
+                cor(low[ratings == 'BB', ret_10], low[`ratings` == 'BB', RRI_trend]), 
+                cor(low[ratings == 'B', ret_10], low[`ratings` == 'B', RRI_trend]), 
+                cor(low[ratings == 'NR', ret_10], low[`ratings` == 'NR', RRI_trend]), 
+                cor(low[ratings == 'X', ret_10], low[`ratings` == 'X', RRI_trend]))
+
+ret_30_low <- c(cor(low[`ratings` == 'AAA', ret_30], low[`ratings` == 'AAA', RRI_trend]), 
+                cor(low[`ratings` == 'AA', ret_30], low[`ratings` == 'AA', RRI_trend]), 
+                cor(low[`ratings` == 'A', ret_30], low[`ratings` == 'A', RRI_trend]), 
+                cor(low[`ratings` == 'BBB', ret_30], low[`ratings` == 'BBB', RRI_trend]), 
+                cor(low[`ratings` == 'BB', ret_30], low[`ratings` == 'BB', RRI_trend]), 
+                cor(low[`ratings` == 'B', ret_30], low[`ratings` == 'B', RRI_trend]), 
+                cor(low[`ratings` == 'NR', ret_30], low[`ratings` == 'NR', RRI_trend]), 
+                cor(low[`ratings` == 'X', ret_30], low[`ratings` == 'X', RRI_trend]))
+
+ret_180_low <- c(cor(low[`ratings` == 'AAA', ret_180], low[`ratings` == 'AAA', RRI_trend]), 
+                 cor(low[`ratings` == 'AA', ret_180], low[`ratings` == 'AA', RRI_trend]), 
+                 cor(low[`ratings` == 'A', ret_180], low[`ratings` == 'A', RRI_trend]), 
+                 cor(low[`ratings` == 'BBB', ret_180], low[`ratings` == 'BBB', RRI_trend]), 
+                 cor(low[`ratings` == 'BB', ret_180], low[`ratings` == 'BB', RRI_trend]), 
+                 cor(low[`ratings` == 'B', ret_180], low[`ratings` == 'B', RRI_trend]), 
+                 cor(low[`ratings` == 'NR', ret_180], low[`ratings` == 'NR', RRI_trend]),
+                 cor(low[`ratings` == 'X', ret_180], low[`ratings` == 'X', RRI_trend]))
+
+rating_ret_cor_low <- data.frame(ret_5_low, ret_10_low, ret_30_low, ret_180_low)
+rownames(rating_ret_cor_low) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+rating_ret_cor_low
+
+write.csv(rating_ret_cor_low, 'rating_ret_cor_low.csv')
+
+
+# Medium
+ret_5_med <- c(cor(med[ratings == 'AAA', ret_5], med[ratings == 'AAA', RRI_trend]), 
+               cor(med[ratings == 'AA', ret_5], med[ratings == 'AA', RRI_trend]), 
+               cor(med[ratings == 'A', ret_5], med[ratings == 'A', RRI_trend]), 
+               cor(med[ratings == 'BBB', ret_5], med[ratings == 'BBB', RRI_trend]), 
+               cor(med[ratings == 'BB', ret_5], med[ratings == 'BB', RRI_trend]), 
+               cor(med[ratings == 'B', ret_5], med[ratings == 'B', RRI_trend]), 
+               cor(med[ratings == 'NR', ret_5], med[ratings == 'NR', RRI_trend]), 
+               cor(med[ratings == 'X', ret_5], med[ratings == 'X', RRI_trend]))
+
+ret_10_med <- c(cor(med[ratings == 'AAA', ret_10], med[`ratings` == 'AAA', RRI_trend]), 
+                cor(med[ratings == 'AA', ret_10], med[`ratings` == 'AA', RRI_trend]), 
+                cor(med[ratings == 'A', ret_10], med[`ratings` == 'A', RRI_trend]), 
+                cor(med[ratings == 'BBB', ret_10], med[`ratings` == 'BBB', RRI_trend]), 
+                cor(med[ratings == 'BB', ret_10], med[`ratings` == 'BB', RRI_trend]), 
+                cor(med[ratings == 'B', ret_10], med[`ratings` == 'B', RRI_trend]), 
+                cor(med[ratings == 'NR', ret_10], med[`ratings` == 'NR', RRI_trend]), 
+                cor(med[ratings == 'X', ret_10], med[`ratings` == 'X', RRI_trend]))
+
+ret_30_med <- c(cor(med[`ratings` == 'AAA', ret_30], med[`ratings` == 'AAA', RRI_trend]), 
+                cor(med[`ratings` == 'AA', ret_30], med[`ratings` == 'AA', RRI_trend]), 
+                cor(med[`ratings` == 'A', ret_30], med[`ratings` == 'A', RRI_trend]), 
+                cor(med[`ratings` == 'BBB', ret_30], med[`ratings` == 'BBB', RRI_trend]), 
+                cor(med[`ratings` == 'BB', ret_30], med[`ratings` == 'BB', RRI_trend]), 
+                cor(med[`ratings` == 'B', ret_30], med[`ratings` == 'B', RRI_trend]), 
+                cor(med[`ratings` == 'NR', ret_30], med[`ratings` == 'NR', RRI_trend]), 
+                cor(med[`ratings` == 'X', ret_30], med[`ratings` == 'X', RRI_trend]))
+
+ret_180_med <- c(cor(med[`ratings` == 'AAA', ret_180], med[`ratings` == 'AAA', RRI_trend]), 
+                 cor(med[`ratings` == 'AA', ret_180], med[`ratings` == 'AA', RRI_trend]), 
+                 cor(med[`ratings` == 'A', ret_180], med[`ratings` == 'A', RRI_trend]), 
+                 cor(med[`ratings` == 'BBB', ret_180], med[`ratings` == 'BBB', RRI_trend]), 
+                 cor(med[`ratings` == 'BB', ret_180], med[`ratings` == 'BB', RRI_trend]), 
+                 cor(med[`ratings` == 'B', ret_180], med[`ratings` == 'B', RRI_trend]), 
+                 cor(med[`ratings` == 'NR', ret_180], med[`ratings` == 'NR', RRI_trend]),
+                 cor(med[`ratings` == 'X', ret_180], med[`ratings` == 'X', RRI_trend]))
+
+rating_ret_cor_med <- data.frame(ret_5_med, ret_10_med, ret_30_med, ret_180_med)
+rownames(rating_ret_cor_med) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+rating_ret_cor_med
+
+write.csv(rating_ret_cor_med, 'rating_ret_cor_med.csv')
+
+
+
+
+
+###### Correlation with CURRENT_RRI
+
+ret_5_c_high <- c(cor(high[ratings == 'AAA', ret_5], high[ratings == 'AAA', current_RRI]), 
+                  cor(high[ratings == 'AA', ret_5], high[ratings == 'AA', current_RRI]), 
+                  cor(high[ratings == 'A', ret_5], high[ratings == 'A', current_RRI]), 
+                  cor(high[ratings == 'BBB', ret_5], high[ratings == 'BBB', current_RRI]), 
+                  cor(high[ratings == 'BB', ret_5], high[ratings == 'BB', current_RRI]), 
+                  cor(high[ratings == 'B', ret_5], high[ratings == 'B', current_RRI]), 
+                  cor(high[ratings == 'NR', ret_5], high[ratings == 'NR', current_RRI]), 
+                  cor(high[ratings == 'X', ret_5], high[ratings == 'X', current_RRI]))
+
+ret_10_c_high <- c(cor(high[ratings == 'AAA', ret_10], high[ratings == 'AAA', current_RRI]), 
+                   cor(high[ratings == 'AA', ret_10], high[ratings == 'AA', current_RRI]), 
+                   cor(high[ratings == 'A', ret_10], high[ratings == 'A', current_RRI]), 
+                   cor(high[ratings == 'BBB', ret_10], high[ratings == 'BBB', current_RRI]), 
+                   cor(high[ratings == 'BB', ret_10], high[ratings == 'BB', current_RRI]), 
+                   cor(high[ratings == 'B', ret_10], high[ratings == 'B', current_RRI]), 
+                   cor(high[ratings == 'NR', ret_10], high[ratings == 'NR', current_RRI]), 
+                   cor(high[ratings == 'X', ret_10], high[ratings == 'X', current_RRI]))
+
+ret_30_c_high <- c(cor(high[ratings == 'AAA', ret_30], high[ratings == 'AAA', current_RRI]), 
+                   cor(high[ratings == 'AA', ret_30], high[ratings == 'AA', current_RRI]), 
+                   cor(high[ratings == 'A', ret_30], high[ratings == 'A', current_RRI]), 
+                   cor(high[ratings == 'BBB', ret_30], high[ratings == 'BBB', current_RRI]), 
+                   cor(high[ratings == 'BB', ret_30], high[ratings == 'BB', current_RRI]), 
+                   cor(high[ratings == 'B', ret_30], high[ratings == 'B', current_RRI]), 
+                   cor(high[ratings == 'NR', ret_30], high[ratings == 'NR', current_RRI]), 
+                   cor(high[ratings == 'X', ret_30], high[ratings == 'X', current_RRI]))
+
+ret_180_c_high <- c(cor(high[ratings == 'AAA', ret_180], high[ratings == 'AAA', current_RRI]), 
+                    cor(high[ratings == 'AA', ret_180], high[ratings == 'AA', current_RRI]), 
+                    cor(high[ratings == 'A', ret_180], high[ratings == 'A', current_RRI]), 
+                    cor(high[ratings == 'BBB', ret_180], high[ratings == 'BBB', current_RRI]), 
+                    cor(high[ratings == 'BB', ret_180], high[ratings == 'BB', current_RRI]), 
+                    cor(high[ratings == 'B', ret_180], high[ratings == 'B', current_RRI]), 
+                    cor(high[ratings == 'NR', ret_180], high[ratings == 'NR', current_RRI]),
+                    cor(high[ratings == 'X', ret_180], high[ratings == 'X', current_RRI]))
+
+rating_ret_cor_c_high <- data.frame(ret_5_c_high, ret_10_c_high, ret_30_c_high, ret_180_c_high)
+rownames(rating_ret_cor_c_high) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+rating_ret_cor_c_high
+
+write.csv(rating_ret_cor_c_high, 'rating_ret_cor_c_high.csv')
+
+
+
+ret_5_c_med <- c(cor(med[ratings == 'AAA', ret_5], med[ratings == 'AAA', current_RRI]), 
+                 cor(med[ratings == 'AA', ret_5], med[ratings == 'AA', current_RRI]), 
+                 cor(med[ratings == 'A', ret_5], med[ratings == 'A', current_RRI]), 
+                 cor(med[ratings == 'BBB', ret_5], med[ratings == 'BBB', current_RRI]), 
+                 cor(med[ratings == 'BB', ret_5], med[ratings == 'BB', current_RRI]), 
+                 cor(med[ratings == 'B', ret_5], med[ratings == 'B', current_RRI]), 
+                 cor(med[ratings == 'NR', ret_5], med[ratings == 'NR', current_RRI]), 
+                 cor(med[ratings == 'X', ret_5], med[ratings == 'X', current_RRI]))
+
+ret_10_c_med <- c(cor(med[ratings == 'AAA', ret_10], med[ratings == 'AAA', current_RRI]), 
+                  cor(med[ratings == 'AA', ret_10], med[ratings == 'AA', current_RRI]), 
+                  cor(med[ratings == 'A', ret_10], med[ratings == 'A', current_RRI]), 
+                  cor(med[ratings == 'BBB', ret_10], med[ratings == 'BBB', current_RRI]), 
+                  cor(med[ratings == 'BB', ret_10], med[ratings == 'BB', current_RRI]), 
+                  cor(med[ratings == 'B', ret_10], med[ratings == 'B', current_RRI]), 
+                  cor(med[ratings == 'NR', ret_10], med[ratings == 'NR', current_RRI]), 
+                  cor(med[ratings == 'X', ret_10], med[ratings == 'X', current_RRI]))
+
+ret_30_c_med <- c(cor(med[ratings == 'AAA', ret_30], med[ratings == 'AAA', current_RRI]), 
+                  cor(med[ratings == 'AA', ret_30], med[ratings == 'AA', current_RRI]), 
+                  cor(med[ratings == 'A', ret_30], med[ratings == 'A', current_RRI]), 
+                  cor(med[ratings == 'BBB', ret_30], med[ratings == 'BBB', current_RRI]), 
+                  cor(med[ratings == 'BB', ret_30], med[ratings == 'BB', current_RRI]), 
+                  cor(med[ratings == 'B', ret_30], med[ratings == 'B', current_RRI]), 
+                  cor(med[ratings == 'NR', ret_30], med[ratings == 'NR', current_RRI]), 
+                  cor(med[ratings == 'X', ret_30], med[ratings == 'X', current_RRI]))
+
+ret_180_c_med <- c(cor(med[ratings == 'AAA', ret_180], med[ratings == 'AAA', current_RRI]), 
+                   cor(med[ratings == 'AA', ret_180], med[ratings == 'AA', current_RRI]), 
+                   cor(med[ratings == 'A', ret_180], med[ratings == 'A', current_RRI]), 
+                   cor(med[ratings == 'BBB', ret_180], med[ratings == 'BBB', current_RRI]), 
+                   cor(med[ratings == 'BB', ret_180], med[ratings == 'BB', current_RRI]), 
+                   cor(med[ratings == 'B', ret_180], med[ratings == 'B', current_RRI]), 
+                   cor(med[ratings == 'NR', ret_180], med[ratings == 'NR', current_RRI]),
+                   cor(med[ratings == 'X', ret_180], med[ratings == 'X', current_RRI]))
+
+rating_ret_cor_c_med <- data.frame(ret_5_c_med, ret_10_c_med, ret_30_c_med, ret_180_c_med)
+rownames(rating_ret_cor_c_med) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+rating_ret_cor_c_med
+
+write.csv(rating_ret_cor_c_med, 'rating_ret_cor_c_med.csv')
+
+
+
+
+
+ret_5_c_low <- c(cor(low[ratings == 'AAA', ret_5], low[ratings == 'AAA', current_RRI]), 
+                 cor(low[ratings == 'AA', ret_5], low[ratings == 'AA', current_RRI]), 
+                 cor(low[ratings == 'A', ret_5], low[ratings == 'A', current_RRI]), 
+                 cor(low[ratings == 'BBB', ret_5], low[ratings == 'BBB', current_RRI]), 
+                 cor(low[ratings == 'BB', ret_5], low[ratings == 'BB', current_RRI]), 
+                 cor(low[ratings == 'B', ret_5], low[ratings == 'B', current_RRI]), 
+                 cor(low[ratings == 'NR', ret_5], low[ratings == 'NR', current_RRI]), 
+                 cor(low[ratings == 'X', ret_5], low[ratings == 'X', current_RRI]))
+
+ret_10_c_low <- c(cor(low[ratings == 'AAA', ret_10], low[ratings == 'AAA', current_RRI]), 
+                  cor(low[ratings == 'AA', ret_10], low[ratings == 'AA', current_RRI]), 
+                  cor(low[ratings == 'A', ret_10], low[ratings == 'A', current_RRI]), 
+                  cor(low[ratings == 'BBB', ret_10], low[ratings == 'BBB', current_RRI]), 
+                  cor(low[ratings == 'BB', ret_10], low[ratings == 'BB', current_RRI]), 
+                  cor(low[ratings == 'B', ret_10], low[ratings == 'B', current_RRI]), 
+                  cor(low[ratings == 'NR', ret_10], low[ratings == 'NR', current_RRI]), 
+                  cor(low[ratings == 'X', ret_10], low[ratings == 'X', current_RRI]))
+
+ret_30_c_low <- c(cor(low[ratings == 'AAA', ret_30], low[ratings == 'AAA', current_RRI]), 
+                  cor(low[ratings == 'AA', ret_30], low[ratings == 'AA', current_RRI]), 
+                  cor(low[ratings == 'A', ret_30], low[ratings == 'A', current_RRI]), 
+                  cor(low[ratings == 'BBB', ret_30], low[ratings == 'BBB', current_RRI]), 
+                  cor(low[ratings == 'BB', ret_30], low[ratings == 'BB', current_RRI]), 
+                  cor(low[ratings == 'B', ret_30], low[ratings == 'B', current_RRI]), 
+                  cor(low[ratings == 'NR', ret_30], low[ratings == 'NR', current_RRI]), 
+                  cor(low[ratings == 'X', ret_30], low[ratings == 'X', current_RRI]))
+
+ret_180_c_low <- c(cor(low[ratings == 'AAA', ret_180], low[ratings == 'AAA', current_RRI]), 
+                   cor(low[ratings == 'AA', ret_180], low[ratings == 'AA', current_RRI]), 
+                   cor(low[ratings == 'A', ret_180], low[ratings == 'A', current_RRI]), 
+                   cor(low[ratings == 'BBB', ret_180], low[ratings == 'BBB', current_RRI]), 
+                   cor(low[ratings == 'BB', ret_180], low[ratings == 'BB', current_RRI]), 
+                   cor(low[ratings == 'B', ret_180], low[ratings == 'B', current_RRI]), 
+                   cor(low[ratings == 'NR', ret_180], low[ratings == 'NR', current_RRI]),
+                   cor(low[ratings == 'X', ret_180], low[ratings == 'X', current_RRI]))
+
+rating_ret_cor_c_low <- data.frame(ret_5_c_low, ret_10_c_low, ret_30_c_low, ret_180_c_low)
+rownames(rating_ret_cor_c_low) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+rating_ret_cor_c_low
+
+write.csv(rating_ret_cor_c_low, 'rating_ret_cor_c_low.csv')
+
+
+
+
+
+
+
+################################################################################
+# Create the excess return table for >10
+ex_ret_5 <- c(mean(data_10[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
+              mean(data_10[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
+              mean(data_10[ratings == 'A', ret_5 - `5_day_spy_ret`]),
+              mean(data_10[ratings == 'BBB', ret_5 - `5_day_spy_ret`]),
+              mean(data_10[ratings == 'BB', ret_5 - `5_day_spy_ret`]),
+              mean(data_10[ratings == 'B', ret_5 - `5_day_spy_ret`]),
+              mean(data_10[ratings == 'NR', ret_5 - `5_day_spy_ret`]),
+              mean(data_10[ratings == 'X', ret_5 - `5_day_spy_ret`]))
+
+ex_ret_10 <- c(mean(data_10[ratings == 'AAA', ret_10 - `10_day_spy_ret`]),
+               mean(data_10[ratings == 'AA', ret_10 - `10_day_spy_ret`]),
+               mean(data_10[ratings == 'A', ret_10 - `10_day_spy_ret`]),
+               mean(data_10[ratings == 'BBB', ret_10 - `10_day_spy_ret`]),
+               mean(data_10[ratings == 'BB', ret_10 - `10_day_spy_ret`]),
+               mean(data_10[ratings == 'B', ret_10 - `10_day_spy_ret`]),
+               mean(data_10[ratings == 'NR', ret_10 - `10_day_spy_ret`]),
+               mean(data_10[ratings == 'X', ret_10 - `10_day_spy_ret`]))
+
+ex_ret_30 <- c(mean(data_10[ratings == 'AAA', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_10[ratings == 'AA', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_10[ratings == 'A', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_10[ratings == 'BBB', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_10[ratings == 'BB', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_10[ratings == 'B', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_10[ratings == 'NR', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_10[ratings == 'X', ret_30 - `30_day_ret`], na.rm=TRUE))
+
+ratings_exret <- data.table(ex_ret_5, ex_ret_10, ex_ret_30)
+rownames(ratings_exret) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+
+# T Statistics
+sd <- c(sd(data_10[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
+        sd(data_10[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
+        sd(data_10[ratings == 'A', ret_5 - `5_day_spy_ret`]),
+        sd(data_10[ratings == 'BBB', ret_5 - `5_day_spy_ret`]),
+        sd(data_10[ratings == 'BB', ret_5 - `5_day_spy_ret`]),
+        sd(data_10[ratings == 'B', ret_5 - `5_day_spy_ret`]),
+        sd(data_10[ratings == 'NR', ret_5 - `5_day_spy_ret`]),
+        sd(data_10[ratings == 'X', ret_5 - `5_day_spy_ret`]))
+n <- c(length(data_10[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
+       length(data_10[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
+       length(data_10[ratings == 'A', ret_5 - `5_day_spy_ret`]),
+       length(data_10[ratings == 'BBB', ret_5 - `5_day_spy_ret`]),
+       length(data_10[ratings == 'BB', ret_5 - `5_day_spy_ret`]),
+       length(data_10[ratings == 'B', ret_5 - `5_day_spy_ret`]),
+       length(data_10[ratings == 'NR', ret_5 - `5_day_spy_ret`]),
+       length(data_10[ratings == 'X', ret_5 - `5_day_spy_ret`]))
+se <- sd/sqrt(n)
+t_5 <- ratings_exret$ex_ret_5/se
+
+sd <- c(sd(data_10[ratings == 'AAA', ret_10 - `10_day_spy_ret`]), 
+        sd(data_10[ratings == 'AA', ret_10 - `10_day_spy_ret`]),
+        sd(data_10[ratings == 'A', ret_10 - `10_day_spy_ret`]),
+        sd(data_10[ratings == 'BBB', ret_10 - `10_day_spy_ret`]),
+        sd(data_10[ratings == 'BB', ret_10 - `10_day_spy_ret`]),
+        sd(data_10[ratings == 'B', ret_10 - `10_day_spy_ret`]),
+        sd(data_10[ratings == 'NR', ret_10 - `10_day_spy_ret`]),
+        sd(data_10[ratings == 'X', ret_10 - `10_day_spy_ret`]))
+
+n <- c(length(data_10[ratings == 'AAA', ret_10 - `10_day_spy_ret`]), 
+       length(data_10[ratings == 'AA', ret_10 - `10_day_spy_ret`]),
+       length(data_10[ratings == 'A', ret_10 - `10_day_spy_ret`]),
+       length(data_10[ratings == 'BBB', ret_10 - `10_day_spy_ret`]),
+       length(data_10[ratings == 'BB', ret_10 - `10_day_spy_ret`]),
+       length(data_10[ratings == 'B', ret_10 - `10_day_spy_ret`]),
+       length(data_10[ratings == 'NR', ret_10 - `10_day_spy_ret`]),
+       length(data_10[ratings == 'X', ret_10 - `10_day_spy_ret`]))
+se <- sd/sqrt(n)
+t_10 <- ratings_exret$ex_ret_10/se
+
+sd<- c(sd(data_10[ratings == 'AAA', ret_30 - `30_day_ret`], na.rm=TRUE), 
+       sd(data_10[ratings == 'AA', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_10[ratings == 'A', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_10[ratings == 'BBB', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_10[ratings == 'BB', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_10[ratings == 'B', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_10[ratings == 'NR', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_10[ratings == 'X', ret_30 - `30_day_ret`], na.rm=TRUE))
+se <- sd/sqrt(n)
+t_30 <- ratings_exret$ex_ret_30/se
+
+t <- data.table(t_5, t_10, t_30)
+rownames(t) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+write.csv(t, 't.csv')
+
+# Annualize the excess returns
+ratings_exret[, ex_ret_5 := (1+ex_ret_5)^(252/5)-1]
+ratings_exret[, ex_ret_10 := (1+ex_ret_10)^(252/10)-1]
+ratings_exret[, ex_ret_30 := (1+ex_ret_30)^(252/30)-1]
+ratings_exret
+write.csv(ratings_exret, 'ratings_exret_10.csv')
+
+
+
+
+# More cases: >5
+ex_ret_5 <- c(mean(data_5[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
+              mean(data_5[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
+              mean(data_5[ratings == 'A', ret_5 - `5_day_spy_ret`]),
+              mean(data_5[ratings == 'BBB', ret_5 - `5_day_spy_ret`]),
+              mean(data_5[ratings == 'BB', ret_5 - `5_day_spy_ret`]),
+              mean(data_5[ratings == 'B', ret_5 - `5_day_spy_ret`]),
+              mean(data_5[ratings == 'NR', ret_5 - `5_day_spy_ret`]),
+              mean(data_5[ratings == 'X', ret_5 - `5_day_spy_ret`]))
+
+ex_ret_10 <- c(mean(data_5[ratings == 'AAA', ret_10 - `10_day_spy_ret`]),
+               mean(data_5[ratings == 'AA', ret_10 - `10_day_spy_ret`]),
+               mean(data_5[ratings == 'A', ret_10 - `10_day_spy_ret`]),
+               mean(data_5[ratings == 'BBB', ret_10 - `10_day_spy_ret`]),
+               mean(data_5[ratings == 'BB', ret_10 - `10_day_spy_ret`]),
+               mean(data_5[ratings == 'B', ret_10 - `10_day_spy_ret`]),
+               mean(data_5[ratings == 'NR', ret_10 - `10_day_spy_ret`]),
+               mean(data_5[ratings == 'X', ret_10 - `10_day_spy_ret`]))
+
+ex_ret_30 <- c(mean(data_5[ratings == 'AAA', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_5[ratings == 'AA', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_5[ratings == 'A', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_5[ratings == 'BBB', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_5[ratings == 'BB', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_5[ratings == 'B', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_5[ratings == 'NR', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_5[ratings == 'X', ret_30 - `30_day_ret`], na.rm=TRUE))
+
+ratings_exret <- data.table(ex_ret_5, ex_ret_10, ex_ret_30)
+rownames(ratings_exret) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+
+# T Statistics
+sd <- c(sd(data_5[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
+        sd(data_5[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
+        sd(data_5[ratings == 'A', ret_5 - `5_day_spy_ret`]),
+        sd(data_5[ratings == 'BBB', ret_5 - `5_day_spy_ret`]),
+        sd(data_5[ratings == 'BB', ret_5 - `5_day_spy_ret`]),
+        sd(data_5[ratings == 'B', ret_5 - `5_day_spy_ret`]),
+        sd(data_5[ratings == 'NR', ret_5 - `5_day_spy_ret`]),
+        sd(data_5[ratings == 'X', ret_5 - `5_day_spy_ret`]))
+n <- c(length(data_5[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
+       length(data_5[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
+       length(data_5[ratings == 'A', ret_5 - `5_day_spy_ret`]),
+       length(data_5[ratings == 'BBB', ret_5 - `5_day_spy_ret`]),
+       length(data_5[ratings == 'BB', ret_5 - `5_day_spy_ret`]),
+       length(data_5[ratings == 'B', ret_5 - `5_day_spy_ret`]),
+       length(data_5[ratings == 'NR', ret_5 - `5_day_spy_ret`]),
+       length(data_5[ratings == 'X', ret_5 - `5_day_spy_ret`]))
+se <- sd/sqrt(n)
+t_5 <- ratings_exret$ex_ret_5/se
+
+sd <- c(sd(data_5[ratings == 'AAA', ret_10 - `10_day_spy_ret`]), 
+        sd(data_5[ratings == 'AA', ret_10 - `10_day_spy_ret`]),
+        sd(data_5[ratings == 'A', ret_10 - `10_day_spy_ret`]),
+        sd(data_5[ratings == 'BBB', ret_10 - `10_day_spy_ret`]),
+        sd(data_5[ratings == 'BB', ret_10 - `10_day_spy_ret`]),
+        sd(data_5[ratings == 'B', ret_10 - `10_day_spy_ret`]),
+        sd(data_5[ratings == 'NR', ret_10 - `10_day_spy_ret`]),
+        sd(data_5[ratings == 'X', ret_10 - `10_day_spy_ret`]))
+
+n <- c(length(data_5[ratings == 'AAA', ret_10 - `10_day_spy_ret`]), 
+       length(data_5[ratings == 'AA', ret_10 - `10_day_spy_ret`]),
+       length(data_5[ratings == 'A', ret_10 - `10_day_spy_ret`]),
+       length(data_5[ratings == 'BBB', ret_10 - `10_day_spy_ret`]),
+       length(data_5[ratings == 'BB', ret_10 - `10_day_spy_ret`]),
+       length(data_5[ratings == 'B', ret_10 - `10_day_spy_ret`]),
+       length(data_5[ratings == 'NR', ret_10 - `10_day_spy_ret`]),
+       length(data_5[ratings == 'X', ret_10 - `10_day_spy_ret`]))
+se <- sd/sqrt(n)
+t_10 <- ratings_exret$ex_ret_10/se
+
+sd<- c(sd(data_5[ratings == 'AAA', ret_30 - `30_day_ret`], na.rm=TRUE), 
+       sd(data_5[ratings == 'AA', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_5[ratings == 'A', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_5[ratings == 'BBB', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_5[ratings == 'BB', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_5[ratings == 'B', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_5[ratings == 'NR', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_5[ratings == 'X', ret_30 - `30_day_ret`], na.rm=TRUE))
+se <- sd/sqrt(n)
+t_30 <- ratings_exret$ex_ret_30/se
+
+t <- data.table(t_5, t_10, t_30)
+rownames(t) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+t
+write.csv(t, 't5.csv')
+
+# Annualize the excess returns
+ratings_exret[, ex_ret_5 := (1+ex_ret_5)^(252/5)-1]
+ratings_exret[, ex_ret_10 := (1+ex_ret_10)^(252/10)-1]
+ratings_exret[, ex_ret_30 := (1+ex_ret_30)^(252/30)-1]
+write.csv(ratings_exret, 'ratings_exret_5.csv')
+
+
+
+
+
+# More cases: >20
+ex_ret_5 <- c(mean(data_20[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
+              mean(data_20[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
+              mean(data_20[ratings == 'A', ret_5 - `5_day_spy_ret`]),
+              mean(data_20[ratings == 'BBB', ret_5 - `5_day_spy_ret`]),
+              mean(data_20[ratings == 'BB', ret_5 - `5_day_spy_ret`]),
+              mean(data_20[ratings == 'B', ret_5 - `5_day_spy_ret`]),
+              mean(data_20[ratings == 'NR', ret_5 - `5_day_spy_ret`]),
+              mean(data_20[ratings == 'X', ret_5 - `5_day_spy_ret`]))
+
+ex_ret_10 <- c(mean(data_20[ratings == 'AAA', ret_10 - `10_day_spy_ret`]),
+               mean(data_20[ratings == 'AA', ret_10 - `10_day_spy_ret`]),
+               mean(data_20[ratings == 'A', ret_10 - `10_day_spy_ret`]),
+               mean(data_20[ratings == 'BBB', ret_10 - `10_day_spy_ret`]),
+               mean(data_20[ratings == 'BB', ret_10 - `10_day_spy_ret`]),
+               mean(data_20[ratings == 'B', ret_10 - `10_day_spy_ret`]),
+               mean(data_20[ratings == 'NR', ret_10 - `10_day_spy_ret`]),
+               mean(data_20[ratings == 'X', ret_10 - `10_day_spy_ret`]))
+
+ex_ret_30 <- c(mean(data_20[ratings == 'AAA', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_20[ratings == 'AA', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_20[ratings == 'A', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_20[ratings == 'BBB', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_20[ratings == 'BB', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_20[ratings == 'B', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_20[ratings == 'NR', ret_30 - `30_day_ret`], na.rm=TRUE),
+               mean(data_20[ratings == 'X', ret_30 - `30_day_ret`], na.rm=TRUE))
+
+ratings_exret <- data.table(ex_ret_5, ex_ret_10, ex_ret_30)
+rownames(ratings_exret) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+
+# T Statistics
+sd <- c(sd(data_20[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
+        sd(data_20[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
+        sd(data_20[ratings == 'A', ret_5 - `5_day_spy_ret`]),
+        sd(data_20[ratings == 'BBB', ret_5 - `5_day_spy_ret`]),
+        sd(data_20[ratings == 'BB', ret_5 - `5_day_spy_ret`]),
+        sd(data_20[ratings == 'B', ret_5 - `5_day_spy_ret`]),
+        sd(data_20[ratings == 'NR', ret_5 - `5_day_spy_ret`]),
+        sd(data_20[ratings == 'X', ret_5 - `5_day_spy_ret`]))
+n <- c(length(data_20[ratings == 'AAA', ret_5 - `5_day_spy_ret`]),
+       length(data_20[ratings == 'AA', ret_5 - `5_day_spy_ret`]),
+       length(data_20[ratings == 'A', ret_5 - `5_day_spy_ret`]),
+       length(data_20[ratings == 'BBB', ret_5 - `5_day_spy_ret`]),
+       length(data_20[ratings == 'BB', ret_5 - `5_day_spy_ret`]),
+       length(data_20[ratings == 'B', ret_5 - `5_day_spy_ret`]),
+       length(data_20[ratings == 'NR', ret_5 - `5_day_spy_ret`]),
+       length(data_20[ratings == 'X', ret_5 - `5_day_spy_ret`]))
+se <- sd/sqrt(n)
+t_5 <- ratings_exret$ex_ret_5/se
+
+sd <- c(sd(data_20[ratings == 'AAA', ret_10 - `10_day_spy_ret`]), 
+        sd(data_20[ratings == 'AA', ret_10 - `10_day_spy_ret`]),
+        sd(data_20[ratings == 'A', ret_10 - `10_day_spy_ret`]),
+        sd(data_20[ratings == 'BBB', ret_10 - `10_day_spy_ret`]),
+        sd(data_20[ratings == 'BB', ret_10 - `10_day_spy_ret`]),
+        sd(data_20[ratings == 'B', ret_10 - `10_day_spy_ret`]),
+        sd(data_20[ratings == 'NR', ret_10 - `10_day_spy_ret`]),
+        sd(data_20[ratings == 'X', ret_10 - `10_day_spy_ret`]))
+
+n <- c(length(data_20[ratings == 'AAA', ret_10 - `10_day_spy_ret`]), 
+       length(data_20[ratings == 'AA', ret_10 - `10_day_spy_ret`]),
+       length(data_20[ratings == 'A', ret_10 - `10_day_spy_ret`]),
+       length(data_20[ratings == 'BBB', ret_10 - `10_day_spy_ret`]),
+       length(data_20[ratings == 'BB', ret_10 - `10_day_spy_ret`]),
+       length(data_20[ratings == 'B', ret_10 - `10_day_spy_ret`]),
+       length(data_20[ratings == 'NR', ret_10 - `10_day_spy_ret`]),
+       length(data_20[ratings == 'X', ret_10 - `10_day_spy_ret`]))
+se <- sd/sqrt(n)
+t_10 <- ratings_exret$ex_ret_10/se
+
+sd<- c(sd(data_20[ratings == 'AAA', ret_30 - `30_day_ret`], na.rm=TRUE), 
+       sd(data_20[ratings == 'AA', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_20[ratings == 'A', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_20[ratings == 'BBB', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_20[ratings == 'BB', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_20[ratings == 'B', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_20[ratings == 'NR', ret_30 - `30_day_ret`], na.rm=TRUE),
+       sd(data_20[ratings == 'X', ret_30 - `30_day_ret`], na.rm=TRUE))
+se <- sd/sqrt(n)
+t_30 <- ratings_exret$ex_ret_30/se
+
+t <- data.table(t_5, t_10, t_30)
+rownames(t) <- c('AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR', 'X')
+t
+write.csv(t, 't20.csv')
+
+# Annualize the excess returns
+ratings_exret[, ex_ret_5 := (1+ex_ret_5)^(252/5)-1]
+ratings_exret[, ex_ret_10 := (1+ex_ret_10)^(252/10)-1]
+ratings_exret[, ex_ret_30 := (1+ex_ret_30)^(252/30)-1]
+write.csv(ratings_exret, 'ratings_exret_20.csv')
+
+
+
+
+
+
+################################################################################
+# Alphas and Betas
+df <- fread("data_10 (2).csv")
+head(df)
+
+#30 day Pf vs spy
+model_30 <- lm(df$ret_30 ~ df$`30_day_ret`)
+summary(model_30)
+
+model_30_alpha <- model_30$coefficients[1]
+model_30_alpha 
+model_30_beta <- model_30$coefficients[2]
+model_30_beta
+
+#10 day Pf vs spy
+
+model_10 <- lm(df$ret_10 ~ df$`10_day_spy_ret`)
+summary(model_10)
+
+model_10_alpha <- model_10$coefficients[1]
+model_10_alpha
+model_10_beta <- model_10$coefficients[2]
+model_10_beta
+
+#5 day Pf vs spy
+
+model_5 <- lm(df$ret_5 ~ df$`5_day_spy_ret`)
+summary(model_5)
+
+model_5_alpha <- model_5$coefficients[1]
+model_5_alpha
+model_5_beta <- model_5$coefficients[2]
+model_5_beta
+
+
+# Ratings AAA
+ratings_AAA <- df[ratings == 'AAA' , c('ret_30', 'ret_10','ret_5', '5_day_spy_ret','10_day_spy_ret','30_day_ret')]
+ratings_AAA
+
+model_AAA_30 <- lm(ratings_AAA$ret_30 ~ ratings_AAA$`30_day_ret`)
+summary(model_AAA_30) 
+#0.03496
+#0.24376
+
+model_AAA_10 <- lm(ratings_AAA$ret_10 ~ ratings_AAA$`10_day_spy_ret`)
+summary(model_AAA_10)
+#-0.013610
+#1.468055
+
+model_AAA_5 <- lm(ratings_AAA$ret_5 ~ ratings_AAA$`5_day_spy_ret`)
+summary(model_AAA_5)
+#-0.019472
+#2.454115
+
+
+# ratings AA
+ratings_AA <- df[ratings == 'AA' , c('ret_30', 'ret_10','ret_5', '5_day_spy_ret','10_day_spy_ret','30_day_ret')]
+ratings_AA
+
+model_AA_30 <- lm(ratings_AA$ret_30 ~ ratings_AA$`30_day_ret`)
+summary(model_AA_30) 
+
+#-0.00424
+#1.16928
+
+model_AA_10 <- lm(ratings_AA$ret_10 ~ ratings_AA$`10_day_spy_ret`)
+summary(model_AA_10)
+
+#-0.005039
+#1.229519
+
+model_AA_5 <- lm(ratings_AA$ret_5 ~ ratings_AA$`5_day_spy_ret`)
+summary(model_AA_5)
+#-0.006453
+#1.270732
+
+
+#ratings A
+ratings_A <- df[ratings == 'A' , c('ret_30', 'ret_10','ret_5', '5_day_spy_ret','10_day_spy_ret','30_day_ret')]
+ratings_A
+
+model_A_30 <- lm(ratings_A$ret_30 ~ ratings_A$`30_day_ret`)
+summary(model_A_30) 
+#-0.002665
+#0.952869
+
+model_A_10 <- lm(ratings_A$ret_10 ~ ratings_A$`10_day_spy_ret`)
+summary(model_A_10)
+#0.004253
+#0.875958
+
+model_A_5 <- lm(ratings_A$ret_5 ~ ratings_A$`5_day_spy_ret`)
+summary(model_A_5)
+#0.0009832
+#0.7899841
+
+
+
+
+#Ratings BBB
+ratings_BBB <- df[ratings == 'BBB' , c('ret_30', 'ret_10','ret_5', '5_day_spy_ret','10_day_spy_ret','30_day_ret')]
+ratings_BBB
+
+model_BBB_30 <- lm(ratings_BBB$ret_30 ~ ratings_BBB$`30_day_ret`)
+summary(model_BBB_30) 
+#-0.004562
+#1.163415
+
+model_BBB_10 <- lm(ratings_BBB$ret_10 ~ ratings_BBB$`10_day_spy_ret`)
+summary(model_BBB_10)
+#-0.0008108
+#1.2086962
+
+model_BBB_5 <- lm(ratings_BBB$ret_5 ~ ratings_BBB$`5_day_spy_ret`)
+summary(model_BBB_5)
+#-0.000901
+#1.073146
+
+
+#Ratings BB
+ratings_BB <- df[ratings == 'BB' , c('ret_30', 'ret_10','ret_5', '5_day_spy_ret','10_day_spy_ret','30_day_ret')]
+ratings_BB
+
+model_BB_30 <- lm(ratings_BB$ret_30 ~ ratings_BB$`30_day_ret`)
+summary(model_BB_30) 
+#-0.001674
+#1.928403
+
+model_BB_10 <- lm(ratings_BB$ret_10 ~ ratings_BB$`10_day_spy_ret`)
+summary(model_BB_10)
+#0.002108
+#1.419596
+
+model_BB_5 <- lm(ratings_BB$ret_5 ~ ratings_BB$`5_day_spy_ret`)
+summary(model_BB_5)
+#0.001062
+#1.217683
+
+
+#Ratings B
+
+ratings_B <- df[ratings == 'B' , c('ret_30', 'ret_10','ret_5', '5_day_spy_ret','10_day_spy_ret','30_day_ret')]
+ratings_B
+
+model_B_30 <- lm(ratings_B$ret_30 ~ ratings_B$`30_day_ret`)
+summary(model_B_30) 
+#0.05815
+#2.46478
+
+model_B_10 <- lm(ratings_B$ret_10 ~ ratings_B$`10_day_spy_ret`)
+summary(model_B_10)
+#0.01803
+#2.35661
+
+model_B_5 <- lm(ratings_B$ret_5 ~ ratings_B$`5_day_spy_ret`)
+summary(model_B_5)
+#0.004328
+#2.969216
+```
