@@ -1,6 +1,7 @@
 # How Does Significant Exposure to ESG Risks Affect Short-term Stock Returns for Companies of Different Health Levels?
 
 Tiancheng Xu, Ford Danielsen, Rishabh Kumar, Rama Sai Sundar Ryali, Evelyn Zhang
+
 Apr 2022
 
 
