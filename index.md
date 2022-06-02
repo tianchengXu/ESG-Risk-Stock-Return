@@ -1,4 +1,6 @@
-# How Does Significant Exposure to ESG Risks Affect Short-term Stock Returns for Companies of Different Health Levels?
+# 
+How Does Significant Exposure to ESG Risks Affect Short-term Stock Returns for Companies of Different Health Levels?
+
 
 ## The goal
 To Understand the Impact of ESG Risk Exposures on Short-term Stock Returns
