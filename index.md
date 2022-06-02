@@ -15,6 +15,7 @@ Do the short-term stock returns of healthy companies and unhealthy companies rea
 
 Should all companies have the same ESG risks management goals? - NO!
 
+
 ## Assumptions & Methodology
 
 ### What is ESG?
@@ -80,5 +81,30 @@ These trends are observed over different ratings to establish if health of a com
 There are multiple factors that influence the return of a stock but with the intention of understanding changes in stock return with ESG risk, we observe a divergence movement in high rated stocks.
 
 
+## Models & Analyses
 
-###
+Base case: 5/10/30-day returns after >10 risk increases; later extended to >5 and >20 risk increases.
+Used excess returns over SPY in order to minimize fluctuation of the market.
+Healthy companies: companies with higher credit ratings (AAA, AA, A).
+Unhealthy companies: those with lower credit ratings (BBB, BB, B).
+
+### AVERAGE 5/10/30-DAY EXCESS RETURNS (ACROSS CREDIT RATINGS) FOR >10 ESG RISK INCREASES (BASE CASE)
+
+<img width="569" alt="image" src="https://user-images.githubusercontent.com/63265930/171702189-0bbd8715-f14b-49ec-9094-7ae02c74fba4.png">
+
+After > 10 risk increases:
+
+Healthier companies tend to see decreased stock returns in 5/10-day periods; unhealthy companies would have relatively higher returns in a 30-day period.
+
+### T STATISTICS: AVERAGE 5/10/30-DAY EXCESS RETURNS (BASE CASE)
+
+Null hypothesis: excess return = 0; alternative hypothesis: excess return != 0
+
+<img width="548" alt="image" src="https://user-images.githubusercontent.com/63265930/171702425-449de39a-3b12-47e5-bb1f-9806661386d1.png">
+
+If we just focus on the top-left and bottom-right corners:
+
+Both have relatively high t-values, which suggest that there's significant evidence to reject the null hypothesis (excess return = 0); 
+it supports our findings from the previous analysis.
+
+
