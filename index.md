@@ -1,4 +1,3 @@
-# 
 How Does Significant Exposure to ESG Risks Affect Short-term Stock Returns for Companies of Different Health Levels?
 
 
