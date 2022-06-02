@@ -108,6 +108,97 @@ Both have relatively high t-values, which suggest that there's significant evide
 it supports our findings from the previous analysis.
 
 
+### Alpha & Beta
+
+<img width="557" alt="image" src="https://user-images.githubusercontent.com/63265930/171725264-de7f1fd0-55a1-4616-8379-c2a3ff9ab09a.png">
+
+<img width="577" alt="image" src="https://user-images.githubusercontent.com/63265930/171725303-fb8f9bbc-4068-49fb-b864-c33754c0a869.png">
+
+Alpha and Beta is calculated considering SPY returns as the Benchmark.
+
+Base case: 5/10/30-day returns after >10 risk increases; later extended to >5 and >20 risk increases.
+
+Used the "lm" function on R to do the regression. The results for all companies are as follows:
+
+<img width="655" alt="image" src="https://user-images.githubusercontent.com/63265930/171725421-3a144ab9-ca4d-4003-86b2-4039b6fdeed1.png">
+
+
+Output & T Statistics
+
+<img width="638" alt="image" src="https://user-images.githubusercontent.com/63265930/171725510-ca08b16e-2133-456c-b848-afb1d27ea46a.png">
+
+### Takeaways
+Overall, we observed negative alpha (excess returns) for healthy companies and positive alpha for unhealthy ones.
+
+There's significant evidence that healthy companies underperform in 5/10-day. All positive alphas are not statistically significant (t-stats < 1.96). 
+
+Systematic risk (𝜷) is high for AAA and B companies.All statistically significant except for two.
+
+Limitation of the model:
+
+Neglects the impacts of firm size and value.
+
+
+### Cumulative Abnormal Return Analysis
+
+<img width="598" alt="image" src="https://user-images.githubusercontent.com/63265930/171725791-3704f9e3-72c6-4c01-a55e-a6f50f600e83.png">
+
+<img width="579" alt="image" src="https://user-images.githubusercontent.com/63265930/171725827-951390c7-abbe-44e0-9d1b-c0fef59c7b62.png">
+
+
+Output & T Statistics
+
+<img width="688" alt="image" src="https://user-images.githubusercontent.com/63265930/171725935-cfcf7d10-6a2a-4ab0-8ab4-004481791268.png">
+
+Overall, we observed negative cumulative abnormal returns (CAR) for healthy companies and positive unhealthy ones.
+
+All negative CARs for healthy companies are significant (95% confidence interval, t-stats > 1.96). All positive CARs for unhealthy companies are significant.
+
+There is no enough significant evidence for most CAR.
+
+The sample size of events is small, especially for AAA, B companies. Require future research to generate more solid insights.
+
+
+<img width="894" alt="image" src="https://user-images.githubusercontent.com/63265930/171726123-911bb6e6-c0ee-4d6e-ae19-37d428c9b078.png">
+
+
+### Takeaways
+The overall results aligned with our pervious findings.
+
+Healthy companies underperform in the short-term; unhealthy companies outperform, especially over 5-day period.
+
+Limitations:
+
+Small sample size might lead to biased results.
+
+More events of unhealthy companies (B category) in our sample.
+
+Event study also includes factors such as earnings announcements, M&As, and unemployment.
+
+Small sample size might lead to biased results.
+
+
+## Conclusion
+
+<img width="781" alt="image" src="https://user-images.githubusercontent.com/63265930/171726345-134cab3f-e166-47fa-9a69-ba0c27cca092.png">
+
+### Further Research to Improve the Analysis
+
+Expand the S&P 500 to Russell 2000 and beyond.
+
+Further dissect credit ratings.
+
+Expand date pool.
+
+Segment events.
+
+Perform on individual ESG sections respectively.
+
+Further dissect E, S, and G.
+
+
+
+
 ### R Code:
 
 Load libraries and functions
@@ -129,7 +220,7 @@ DATE2 <- function(x) {
 }
 ```
 
-Data ETL
+ETL
 ```
 # The master table consists of 4 separate datasets that we managed to pull from 
 # WRDS-RepRisk, WRDS-CRSP and other online sources. Each of these 4 datasets were
