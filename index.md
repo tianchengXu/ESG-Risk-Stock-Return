@@ -6,11 +6,14 @@ Tiancheng Xu, Ford Danielsen, Rishabh Kumar, Rama Sai Sundar Ryali, Evelyn Zhang
 Apr 2022
 
 
+## Role & Main Tasks in the Project
+Data engineer and modeling specialist - I was in charge of collecting data from multiple databases, performing ETL, linking/compiling/storing them and feeding team members with specific datasets upon request.
+
 ## The goal
 To Understand the Impact of ESG Risk Exposures on Short-term Stock Returns
 
 
-## Executive Summary
+## Summary
 Do the short-term stock returns of healthy companies and unhealthy companies react to negative ESG news in the same way? - NO!
 
 Should all companies have the same ESG risks management goals? - NO!
