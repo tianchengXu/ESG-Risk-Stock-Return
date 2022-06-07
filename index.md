@@ -54,7 +54,7 @@ A company's RRI gets updated by the end of each month. It represents the combine
 ## Exploratory Data Analysis
 
 ### GENERAL ANALYSIS
-Objective: To understand the data with reference to credit ratings and ESG
+Objective: To understand the data with reference to credit ratings and ESG.
 
 <img width="253" alt="image" src="https://user-images.githubusercontent.com/63265930/171700813-2e68e106-d5cc-4163-adae-525d56098eb2.png">
 <img width="329" alt="image" src="https://user-images.githubusercontent.com/63265930/171700849-8b2d1b45-10ac-4311-8fed-acd832ff626e.png">
@@ -67,7 +67,7 @@ Peak reprisk index decreases as the health of a company decreases.
 
 
 ### RRI TRENDS BY RATINGS
-Objective: To understand the ESG risk exposure based on the health of an organization 
+Objective: To understand the ESG risk exposure based on the health of an organization.
 
 <img width="530" alt="image" src="https://user-images.githubusercontent.com/63265930/171701121-e39ac2e8-0b24-4b58-a398-58ae0b1cc46f.png">
 
@@ -77,7 +77,7 @@ Historically, companies with better health (ratings) are shown to have higher ex
 
 
 ### LONG/SHORT TERM RETURNS BY ESG RISK
-Objective: To understand the impact of ESG risk exposure in different ratings on short- and long-term returns
+Objective: To understand the impact of ESG risk exposure in different ratings on short- and long-term returns.
 
 <img width="611" alt="image" src="https://user-images.githubusercontent.com/63265930/171701532-04b5eca9-d6b9-45d1-809f-ce22e0f33449.png">
 <img width="573" alt="image" src="https://user-images.githubusercontent.com/63265930/171701708-b142456e-bd44-40dd-a8d4-a0a36c859a9f.png">
@@ -106,7 +106,7 @@ Healthier companies tend to see decreased stock returns in 5/10-day periods; unh
 
 ### T STATISTICS: AVERAGE 5/10/30-DAY EXCESS RETURNS (BASE CASE)
 
-Null hypothesis: excess return = 0; alternative hypothesis: excess return != 0
+Null hypothesis: excess return = 0; alternative hypothesis: excess return != 0.
 
 <img width="548" alt="image" src="https://user-images.githubusercontent.com/63265930/171702425-449de39a-3b12-47e5-bb1f-9806661386d1.png">
 
