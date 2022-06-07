@@ -7,10 +7,15 @@ Apr 2022
 
 
 ## Role & Main Tasks in the Project
-Data engineer and modeling specialist - I was in charge of collecting data from multiple databases, performing ETL, linking/compiling/storing them and feeding team members with specific datasets upon request.
+Data engineer and modeling specialist - I was in charge of collecting data from multiple databases, performing ETL, linking/compiling/storing them and feeding team members with specific datasets upon request; I also performed analysis on stock returns data and ESG data and validated the insights with statistical methods.
+
+## Takeaways
+According to our analysis, different ESG policies and different levels of exposure to ESG risks have different implications to companies. Credit-healthy companies tend to face nagative short-term stock returns when there is significant exposure to ESG risks. Credit-unhealthy companies seem to be less impacted by these similar risks. There are, inevitably, limitations with the analysis given the scope of the project. The insights can be further validated or improved once more data and resources become available.
+
+---
 
 ## The goal
-To Understand the Impact of ESG Risk Exposures on Short-term Stock Returns
+To Understand the Impact of ESG Risk Exposures on Short-term Stock Returns.
 
 
 ## Summary
